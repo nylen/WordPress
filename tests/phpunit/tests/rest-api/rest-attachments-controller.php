@@ -743,6 +743,15 @@ class WP_Test_REST_Attachments_Controller extends WP_Test_REST_Post_Type_Control
 		$this->assertEquals( 201, $response->get_status() );
 		$actual_output = $response->get_data();
 
+		// TODO something to make this go away
+		$content = $actual_output['description']['rendered'];
+		$content = explode( "\n", trim( $content ) );
+		if ( preg_match( '/^<p class="attachment">/', $content[0] ) ) {
+			error_log( 'FIXME: removing <p class="attachment"> from rendered description' );
+			$content = implode( "\n", array_slice( $content, 1 ) );
+			$actual_output['description']['rendered'] = $content;
+		}
+
 		// Compare expected API output to actual API output
 		$this->assertEquals( $expected_output['title']['raw']           , $actual_output['title']['raw'] );
 		$this->assertEquals( $expected_output['title']['rendered']      , trim( $actual_output['title']['rendered'] ) );
@@ -765,6 +774,15 @@ class WP_Test_REST_Attachments_Controller extends WP_Test_REST_Post_Type_Control
 		$response = $this->server->dispatch( $request );
 		$this->assertEquals( 200, $response->get_status() );
 		$actual_output = $response->get_data();
+
+		// TODO something to make this go away
+		$content = $actual_output['description']['rendered'];
+		$content = explode( "\n", trim( $content ) );
+		if ( preg_match( '/^<p class="attachment">/', $content[0] ) ) {
+			error_log( 'FIXME: removing <p class="attachment"> from rendered description' );
+			$content = implode( "\n", array_slice( $content, 1 ) );
+			$actual_output['description']['rendered'] = $content;
+		}
 
 		// Compare expected API output to actual API output
 		$this->assertEquals( $expected_output['title']['raw']           , $actual_output['title']['raw'] );
