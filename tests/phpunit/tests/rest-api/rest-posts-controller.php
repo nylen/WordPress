@@ -2019,24 +2019,21 @@ class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Te
 		}
 		$response = $this->server->dispatch( $request );
 		$this->assertEquals( 201, $response->get_status() );
-
-		$expected_output = array_merge( $input, $expected_output );
-
 		$actual_output = $response->get_data();
-		$actual_output['content'] = $actual_output['content']['raw'];
-		$actual_output['title'] = $actual_output['title']['raw'];
-		$actual_output['excerpt'] = $actual_output['excerpt']['raw'];
 
 		// Compare expected API output to actual API output
-		foreach ( $expected_output as $name => $value ) {
-			$this->assertEquals( $expected_output[ $name ], $actual_output[ $name ], "bad $name on create (API)" );
-		}
+		$this->assertEquals( $expected_output['title']['raw']       , $actual_output['title']['raw'] );
+		$this->assertEquals( $expected_output['title']['rendered']  , trim( $actual_output['title']['rendered'] ) );
+		$this->assertEquals( $expected_output['content']['raw']     , $actual_output['content']['raw'] );
+		$this->assertEquals( $expected_output['content']['rendered'], trim( $actual_output['content']['rendered'] ) );
+		$this->assertEquals( $expected_output['excerpt']['raw']     , $actual_output['excerpt']['raw'] );
+		$this->assertEquals( $expected_output['excerpt']['rendered'], trim( $actual_output['excerpt']['rendered'] ) );
 
 		// Compare expected API output to WP internal values
 		$post = get_post( $actual_output['id'] );
-		$this->assertEquals( $expected_output['title'], $post->post_title, 'bad title on create (WP)' );
-		$this->assertEquals( $expected_output['content'], $post->post_content, 'bad content on create (WP)' );
-		$this->assertEquals( $expected_output['excerpt'], $post->post_excerpt, 'bad excerpt on create (WP)' );
+		$this->assertEquals( $expected_output['title']['raw'], $post->post_title );
+		$this->assertEquals( $expected_output['content']['raw'], $post->post_content );
+		$this->assertEquals( $expected_output['excerpt']['raw'], $post->post_excerpt );
 
 		// Update the post
 		$request = new WP_REST_Request( 'PUT', sprintf( '/wp/v2/posts/%d', $actual_output['id'] ) );
@@ -2045,35 +2042,47 @@ class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Te
 		}
 		$response = $this->server->dispatch( $request );
 		$this->assertEquals( 200, $response->get_status() );
-
 		$actual_output = $response->get_data();
-		$actual_output['content'] = $actual_output['content']['raw'];
-		$actual_output['title'] = $actual_output['title']['raw'];
-		$actual_output['excerpt'] = $actual_output['excerpt']['raw'];
 
 		// Compare expected API output to actual API output
-		foreach ( $expected_output as $name => $value ) {
-			$this->assertEquals( $expected_output[ $name ], $actual_output[ $name ], "bad $name on update (API)" );
-		}
+		$this->assertEquals( $expected_output['title']['raw']       , $actual_output['title']['raw'] );
+		$this->assertEquals( $expected_output['title']['rendered']  , trim( $actual_output['title']['rendered'] ) );
+		$this->assertEquals( $expected_output['content']['raw']     , $actual_output['content']['raw'] );
+		$this->assertEquals( $expected_output['content']['rendered'], trim( $actual_output['content']['rendered'] ) );
+		$this->assertEquals( $expected_output['excerpt']['raw']     , $actual_output['excerpt']['raw'] );
+		$this->assertEquals( $expected_output['excerpt']['rendered'], trim( $actual_output['excerpt']['rendered'] ) );
 
 		// Compare expected API output to WP internal values
 		$post = get_post( $actual_output['id'] );
-		$this->assertEquals( $expected_output['title'], $post->post_title, 'bad title on update (WP)' );
-		$this->assertEquals( $expected_output['content'], $post->post_content, 'bad content on update (WP)' );
-		$this->assertEquals( $expected_output['excerpt'], $post->post_excerpt, 'bad excerpt on update (WP)' );
+		$this->assertEquals( $expected_output['title']['raw']  , $post->post_title );
+		$this->assertEquals( $expected_output['content']['raw'], $post->post_content );
+		$this->assertEquals( $expected_output['excerpt']['raw'], $post->post_excerpt );
 	}
 
-	public function test_post_roundtrip_as_author_1() {
+	public function test_item_roundtrip_as_author_1() {
 		wp_set_current_user( self::$author_id );
 		$this->assertFalse( current_user_can( 'unfiltered_html' ) );
 		$this->verify_post_roundtrip( array(
 			'title'   => '\o/ ¯\_(ツ)_/¯ 🚢',
 			'content' => '\o/ ¯\_(ツ)_/¯ 🚢',
 			'excerpt' => '\o/ ¯\_(ツ)_/¯ 🚢',
+		), array(
+			'title' => array(
+				'raw'      => '\o/ ¯\_(ツ)_/¯ 🚢',
+				'rendered' => '\o/ ¯\_(ツ)_/¯ 🚢',
+			),
+			'content' => array(
+				'raw'      => '\o/ ¯\_(ツ)_/¯ 🚢',
+				'rendered' => '<p>\o/ ¯\_(ツ)_/¯ 🚢</p>',
+			),
+			'excerpt' => array(
+				'raw'      => '\o/ ¯\_(ツ)_/¯ 🚢',
+				'rendered' => '<p>\o/ ¯\_(ツ)_/¯ 🚢</p>',
+			),
 		) );
 	}
 
-	public function test_post_roundtrip_as_author_2() {
+	public function test_item_roundtrip_as_author_2() {
 		wp_set_current_user( self::$author_id );
 		$this->assertFalse( current_user_can( 'unfiltered_html' ) );
 		$this->verify_post_roundtrip( array(
@@ -2081,13 +2090,22 @@ class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Te
 			'content' => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
 			'excerpt' => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
 		), array(
-			'title'   => '\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;',
-			'content' => '\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;',
-			'excerpt' => '\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;',
+			'title' => array(
+				'raw'      => '\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;',
+				'rendered' => '\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;',
+			),
+			'content' => array(
+				'raw'      => '\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;',
+				'rendered' => '<p>\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;</p>',
+			),
+			'excerpt' => array(
+				'raw'      => '\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;',
+				'rendered' => '<p>\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;</p>',
+			),
 		) );
 	}
 
-	public function test_post_roundtrip_as_author_unfiltered_html_1() {
+	public function test_item_roundtrip_as_author_unfiltered_html_1() {
 		wp_set_current_user( self::$author_id );
 		$this->assertFalse( current_user_can( 'unfiltered_html' ) );
 		$this->verify_post_roundtrip( array(
@@ -2095,13 +2113,22 @@ class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Te
 			'content' => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
 			'excerpt' => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
 		), array(
-			'title'   => 'div <strong>strong</strong> oh noes',
-			'content' => '<div>div</div> <strong>strong</strong> oh noes',
-			'excerpt' => '<div>div</div> <strong>strong</strong> oh noes',
+			'title' => array(
+				'raw'      => 'div <strong>strong</strong> oh noes',
+				'rendered' => 'div <strong>strong</strong> oh noes',
+			),
+			'content' => array(
+				'raw'      => '<div>div</div> <strong>strong</strong> oh noes',
+				'rendered' => "<div>div</div>\n<p> <strong>strong</strong> oh noes</p>",
+			),
+			'excerpt' => array(
+				'raw'      => '<div>div</div> <strong>strong</strong> oh noes',
+				'rendered' => "<div>div</div>\n<p> <strong>strong</strong> oh noes</p>",
+			),
 		) );
 	}
 
-	public function test_post_roundtrip_as_author_unfiltered_html_2() {
+	public function test_item_roundtrip_as_author_unfiltered_html_2() {
 		wp_set_current_user( self::$author_id );
 		$this->assertFalse( current_user_can( 'unfiltered_html' ) );
 		$this->verify_post_roundtrip( array(
@@ -2109,23 +2136,45 @@ class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Te
 			'content' => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
 			'excerpt' => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
 		), array(
-			'title'   => '<a href="#">link</a>',
-			'content' => '<a href="#" target="_blank">link</a>',
-			'excerpt' => '<a href="#" target="_blank">link</a>',
+			'title' => array(
+				'raw'      => '<a href="#">link</a>',
+				'rendered' => '<a href="#">link</a>',
+			),
+			'content' => array(
+				'raw'      => '<a href="#" target="_blank">link</a>',
+				'rendered' => '<p><a href="#" target="_blank">link</a></p>',
+			),
+			'excerpt' => array(
+				'raw'      => '<a href="#" target="_blank">link</a>',
+				'rendered' => '<p><a href="#" target="_blank">link</a></p>',
+			),
 		) );
 	}
 
-	public function test_post_roundtrip_as_editor_1() {
+	public function test_item_roundtrip_as_editor_1() {
 		wp_set_current_user( self::$editor_id );
 		$this->assertEquals( ! is_multisite(), current_user_can( 'unfiltered_html' ) );
 		$this->verify_post_roundtrip( array(
 			'title'   => '\o/ ¯\_(ツ)_/¯ 🚢',
 			'content' => '\o/ ¯\_(ツ)_/¯ 🚢',
 			'excerpt' => '\o/ ¯\_(ツ)_/¯ 🚢',
+		), array(
+			'title' => array(
+				'raw'      => '\o/ ¯\_(ツ)_/¯ 🚢',
+				'rendered' => '\o/ ¯\_(ツ)_/¯ 🚢',
+			),
+			'content' => array(
+				'raw'      => '\o/ ¯\_(ツ)_/¯ 🚢',
+				'rendered' => '<p>\o/ ¯\_(ツ)_/¯ 🚢</p>',
+			),
+			'excerpt' => array(
+				'raw'      => '\o/ ¯\_(ツ)_/¯ 🚢',
+				'rendered' => '<p>\o/ ¯\_(ツ)_/¯ 🚢</p>',
+			),
 		) );
 	}
 
-	public function test_post_roundtrip_as_editor_2() {
+	public function test_item_roundtrip_as_editor_2() {
 		wp_set_current_user( self::$editor_id );
 		if ( is_multisite() ) {
 			$this->assertFalse( current_user_can( 'unfiltered_html' ) );
@@ -2134,9 +2183,18 @@ class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Te
 				'content' => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
 				'excerpt' => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
 			), array(
-				'title'   => '\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;',
-				'content' => '\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;',
-				'excerpt' => '\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;',
+				'title' => array(
+					'raw'      => '\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;',
+					'rendered' => '\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;',
+				),
+				'content' => array(
+					'raw'      => '\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;',
+					'rendered' => '<p>\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;</p>',
+				),
+				'excerpt' => array(
+					'raw'      => '\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;',
+					'rendered' => '<p>\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;</p>',
+				),
 			) );
 		} else {
 			$this->assertTrue( current_user_can( 'unfiltered_html' ) );
@@ -2144,11 +2202,24 @@ class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Te
 				'title'   => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
 				'content' => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
 				'excerpt' => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+			), array(
+				'title' => array(
+					'raw'      => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+					'rendered' => '\\\&#038;\\\ &amp; &invalid; < &lt; &amp;lt;',
+				),
+				'content' => array(
+					'raw'      => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+					'rendered' => '<p>\\\&#038;\\\ &amp; &invalid; < &lt; &amp;lt;' . "\n</p>",
+				),
+				'excerpt' => array(
+					'raw'      => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+					'rendered' => '<p>\\\&#038;\\\ &amp; &invalid; < &lt; &amp;lt;' . "\n</p>",
+				),
 			) );
 		}
 	}
 
-	public function test_post_roundtrip_as_editor_unfiltered_html_1() {
+	public function test_item_roundtrip_as_editor_unfiltered_html_1() {
 		wp_set_current_user( self::$editor_id );
 		if ( is_multisite() ) {
 			$this->assertFalse( current_user_can( 'unfiltered_html' ) );
@@ -2157,9 +2228,18 @@ class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Te
 				'content' => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
 				'excerpt' => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
 			), array(
-				'title'   => 'div <strong>strong</strong> oh noes',
-				'content' => '<div>div</div> <strong>strong</strong> oh noes',
-				'excerpt' => '<div>div</div> <strong>strong</strong> oh noes',
+				'title' => array(
+					'raw'      => 'div <strong>strong</strong> oh noes',
+					'rendered' => 'div <strong>strong</strong> oh noes',
+				),
+				'content' => array(
+					'raw'      => '<div>div</div> <strong>strong</strong> oh noes',
+					'rendered' => '<p><div>div</div> <strong>strong</strong> oh noes</p>',
+				),
+				'excerpt' => array(
+					'raw'      => '<div>div</div> <strong>strong</strong> oh noes',
+					'rendered' => '<p><div>div</div> <strong>strong</strong> oh noes</p>',
+				),
 			) );
 		} else {
 			$this->assertTrue( current_user_can( 'unfiltered_html' ) );
@@ -2167,11 +2247,24 @@ class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Te
 				'title'   => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
 				'content' => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
 				'excerpt' => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+			), array(
+				'title' => array(
+					'raw'      => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+					'rendered' => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+				),
+				'content' => array(
+					'raw'      => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+					'rendered' => "<div>div</div>\n<p> <strong>strong</strong> <script>oh noes</script></p>",
+				),
+				'excerpt' => array(
+					'raw'      => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+					'rendered' => "<div>div</div>\n<p> <strong>strong</strong> <script>oh noes</script></p>",
+				),
 			) );
 		}
 	}
 
-	public function test_post_roundtrip_as_editor_unfiltered_html_2() {
+	public function test_item_roundtrip_as_editor_unfiltered_html_2() {
 		wp_set_current_user( self::$editor_id );
 		if ( is_multisite() ) {
 			$this->assertFalse( current_user_can( 'unfiltered_html' ) );
@@ -2180,9 +2273,18 @@ class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Te
 				'content' => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
 				'excerpt' => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
 			), array(
-				'title'   => '<a href="#">link</a>',
-				'content' => '<a href="#" target="_blank">link</a>',
-				'excerpt' => '<a href="#" target="_blank">link</a>',
+				'title' => array(
+					'raw'      => '<a href="#">link</a>',
+					'rendered' => '<a href="#">link</a>',
+				),
+				'content' => array(
+					'raw'      => '<a href="#" target="_blank">link</a>',
+					'rendered' => '<p><a href="#" target="_blank">link</a></p>',
+				),
+				'excerpt' => array(
+					'raw'      => '<a href="#" target="_blank">link</a>',
+					'rendered' => '<p><a href="#" target="_blank">link</a></p>',
+				),
 			) );
 		} else {
 			$this->assertTrue( current_user_can( 'unfiltered_html' ) );
@@ -2190,31 +2292,70 @@ class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Te
 				'title'   => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
 				'content' => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
 				'excerpt' => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+			), array(
+				'title' => array(
+					'raw'      => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+					'rendered' => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+				),
+				'content' => array(
+					'raw'      => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+					'rendered' => '<p><a href="#" target="_blank" data-unfiltered=true>link</a></p>',
+				),
+				'excerpt' => array(
+					'raw'      => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+					'rendered' => '<p><a href="#" target="_blank" data-unfiltered=true>link</a></p>',
+				),
 			) );
 		}
 	}
 
-	public function test_post_roundtrip_as_superadmin_1() {
+	public function test_item_roundtrip_as_superadmin_1() {
 		wp_set_current_user( self::$superadmin_id );
 		$this->assertTrue( current_user_can( 'unfiltered_html' ) );
 		$this->verify_post_roundtrip( array(
 			'title'   => '\o/ ¯\_(ツ)_/¯ 🚢',
 			'content' => '\o/ ¯\_(ツ)_/¯ 🚢',
 			'excerpt' => '\o/ ¯\_(ツ)_/¯ 🚢',
+		), array(
+			'title' => array(
+				'raw'      => '\o/ ¯\_(ツ)_/¯ 🚢',
+				'rendered' => '\o/ ¯\_(ツ)_/¯ 🚢',
+			),
+			'content' => array(
+				'raw'      => '\o/ ¯\_(ツ)_/¯ 🚢',
+				'rendered' => '<p>\o/ ¯\_(ツ)_/¯ 🚢</p>',
+			),
+			'excerpt' => array(
+				'raw'      => '\o/ ¯\_(ツ)_/¯ 🚢',
+				'rendered' => '<p>\o/ ¯\_(ツ)_/¯ 🚢</p>',
+			),
 		) );
 	}
 
-	public function test_post_roundtrip_as_superadmin_2() {
+	public function test_item_roundtrip_as_superadmin_2() {
 		wp_set_current_user( self::$superadmin_id );
 		$this->assertTrue( current_user_can( 'unfiltered_html' ) );
 		$this->verify_post_roundtrip( array(
 			'title'   => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
 			'content' => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
 			'excerpt' => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+		), array(
+			'title' => array(
+				'raw'      => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+				'rendered' => '\\\&#038;\\\ &amp; &invalid; < &lt; &amp;lt;',
+			),
+			'content' => array(
+				'raw'      => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+				'rendered' => '<p>\\\&#038;\\\ &amp; &invalid; < &lt; &amp;lt;' . "\n</p>",
+			),
+			'excerpt' => array(
+				'raw'      => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+				'rendered' => '<p>\\\&#038;\\\ &amp; &invalid; < &lt; &amp;lt;' . "\n</p>",
+			),
 		) );
 	}
 
-	public function test_post_roundtrip_as_superadmin_unfiltered_html_1() {
+	public function test_item_roundtrip_as_superadmin_unfiltered_html_1() {
 		wp_set_current_user( self::$superadmin_id );
 		$this->assertTrue( current_user_can( 'unfiltered_html' ) );
 		$this->verify_post_roundtrip( array(
@@ -2222,13 +2363,22 @@ class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Te
 			'content' => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
 			'excerpt' => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
 		), array(
-			'title'   => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
-			'content' => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
-			'excerpt' => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+			'title' => array(
+				'raw'      => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+				'rendered' => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+			),
+			'content' => array(
+				'raw'      => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+				'rendered' => "<div>div</div>\n<p> <strong>strong</strong> <script>oh noes</script></p>",
+			),
+			'excerpt' => array(
+				'raw'      => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+				'rendered' => "<div>div</div>\n<p> <strong>strong</strong> <script>oh noes</script></p>",
+			),
 		) );
 	}
 
-	public function test_post_roundtrip_as_superadmin_unfiltered_html_2() {
+	public function test_item_roundtrip_as_superadmin_unfiltered_html_2() {
 		wp_set_current_user( self::$superadmin_id );
 		$this->assertTrue( current_user_can( 'unfiltered_html' ) );
 		$this->verify_post_roundtrip( array(
@@ -2236,9 +2386,18 @@ class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Te
 			'content' => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
 			'excerpt' => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
 		), array(
-			'title'   => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
-			'content' => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
-			'excerpt' => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+			'title' => array(
+				'raw'      => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+				'rendered' => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+			),
+			'content' => array(
+				'raw'      => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+				'rendered' => '<p><a href="#" target="_blank" data-unfiltered=true>link</a></p>',
+			),
+			'excerpt' => array(
+				'raw'      => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+				'rendered' => '<p><a href="#" target="_blank" data-unfiltered=true>link</a></p>',
+			),
 		) );
 	}
 
