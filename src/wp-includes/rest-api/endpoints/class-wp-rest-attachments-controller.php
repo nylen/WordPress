@@ -142,7 +142,7 @@ class WP_REST_Attachments_Controller extends WP_REST_Posts_Controller {
 			$attachment->post_title = preg_replace( '/\.[^.]+$/', '', basename( $file ) );
 		}
 
-		$id = wp_insert_post( wp_slash( $attachment ), true );
+		$id = wp_insert_post( wp_slash( (array) $attachment ), true );
 
 		if ( is_wp_error( $id ) ) {
 			if ( 'db_update_error' === $id->get_error_code() ) {

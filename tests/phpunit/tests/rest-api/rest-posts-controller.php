@@ -25,7 +25,7 @@ class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Te
 		self::$post_id = $factory->post->create();
 
 		self::$superadmin_id = $factory->user->create( array(
-			'role' => 'administrator',
+			'role'       => 'administrator',
 			'user_login' => 'superadmin',
 		) );
 		self::$editor_id = $factory->user->create( array(
@@ -2059,7 +2059,7 @@ class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Te
 		$this->assertEquals( $expected_output['excerpt']['raw'], $post->post_excerpt );
 	}
 
-	public function test_item_roundtrip_as_author_1() {
+	public function test_post_roundtrip_as_author_1() {
 		wp_set_current_user( self::$author_id );
 		$this->assertFalse( current_user_can( 'unfiltered_html' ) );
 		$this->verify_post_roundtrip( array(
@@ -2082,7 +2082,7 @@ class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Te
 		) );
 	}
 
-	public function test_item_roundtrip_as_author_2() {
+	public function test_post_roundtrip_as_author_2() {
 		wp_set_current_user( self::$author_id );
 		$this->assertFalse( current_user_can( 'unfiltered_html' ) );
 		$this->verify_post_roundtrip( array(
@@ -2105,7 +2105,7 @@ class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Te
 		) );
 	}
 
-	public function test_item_roundtrip_as_author_unfiltered_html_1() {
+	public function test_post_roundtrip_as_author_unfiltered_html_1() {
 		wp_set_current_user( self::$author_id );
 		$this->assertFalse( current_user_can( 'unfiltered_html' ) );
 		$this->verify_post_roundtrip( array(
@@ -2128,7 +2128,7 @@ class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Te
 		) );
 	}
 
-	public function test_item_roundtrip_as_author_unfiltered_html_2() {
+	public function test_post_roundtrip_as_author_unfiltered_html_2() {
 		wp_set_current_user( self::$author_id );
 		$this->assertFalse( current_user_can( 'unfiltered_html' ) );
 		$this->verify_post_roundtrip( array(
@@ -2151,7 +2151,7 @@ class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Te
 		) );
 	}
 
-	public function test_item_roundtrip_as_editor_1() {
+	public function test_post_roundtrip_as_editor_1() {
 		wp_set_current_user( self::$editor_id );
 		$this->assertEquals( ! is_multisite(), current_user_can( 'unfiltered_html' ) );
 		$this->verify_post_roundtrip( array(
@@ -2174,7 +2174,7 @@ class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Te
 		) );
 	}
 
-	public function test_item_roundtrip_as_editor_2() {
+	public function test_post_roundtrip_as_editor_2() {
 		wp_set_current_user( self::$editor_id );
 		if ( is_multisite() ) {
 			$this->assertFalse( current_user_can( 'unfiltered_html' ) );
@@ -2219,7 +2219,7 @@ class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Te
 		}
 	}
 
-	public function test_item_roundtrip_as_editor_unfiltered_html_1() {
+	public function test_post_roundtrip_as_editor_unfiltered_html_1() {
 		wp_set_current_user( self::$editor_id );
 		if ( is_multisite() ) {
 			$this->assertFalse( current_user_can( 'unfiltered_html' ) );
@@ -2264,7 +2264,7 @@ class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Te
 		}
 	}
 
-	public function test_item_roundtrip_as_editor_unfiltered_html_2() {
+	public function test_post_roundtrip_as_editor_unfiltered_html_2() {
 		wp_set_current_user( self::$editor_id );
 		if ( is_multisite() ) {
 			$this->assertFalse( current_user_can( 'unfiltered_html' ) );
@@ -2309,7 +2309,7 @@ class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Te
 		}
 	}
 
-	public function test_item_roundtrip_as_superadmin_1() {
+	public function test_post_roundtrip_as_superadmin_1() {
 		wp_set_current_user( self::$superadmin_id );
 		$this->assertTrue( current_user_can( 'unfiltered_html' ) );
 		$this->verify_post_roundtrip( array(
@@ -2332,7 +2332,7 @@ class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Te
 		) );
 	}
 
-	public function test_item_roundtrip_as_superadmin_2() {
+	public function test_post_roundtrip_as_superadmin_2() {
 		wp_set_current_user( self::$superadmin_id );
 		$this->assertTrue( current_user_can( 'unfiltered_html' ) );
 		$this->verify_post_roundtrip( array(
@@ -2355,7 +2355,7 @@ class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Te
 		) );
 	}
 
-	public function test_item_roundtrip_as_superadmin_unfiltered_html_1() {
+	public function test_post_roundtrip_as_superadmin_unfiltered_html_1() {
 		wp_set_current_user( self::$superadmin_id );
 		$this->assertTrue( current_user_can( 'unfiltered_html' ) );
 		$this->verify_post_roundtrip( array(
@@ -2378,7 +2378,7 @@ class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Te
 		) );
 	}
 
-	public function test_item_roundtrip_as_superadmin_unfiltered_html_2() {
+	public function test_post_roundtrip_as_superadmin_unfiltered_html_2() {
 		wp_set_current_user( self::$superadmin_id );
 		$this->assertTrue( current_user_can( 'unfiltered_html' ) );
 		$this->verify_post_roundtrip( array(

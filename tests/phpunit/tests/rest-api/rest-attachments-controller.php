@@ -10,12 +10,18 @@
  * @group restapi
  */
 class WP_Test_REST_Attachments_Controller extends WP_Test_REST_Post_Type_Controller_Testcase {
+
+	protected static $superadmin_id;
 	protected static $editor_id;
 	protected static $author_id;
 	protected static $contributor_id;
 	protected static $uploader_id;
 
 	public static function wpSetUpBeforeClass( $factory ) {
+		self::$superadmin_id = $factory->user->create( array(
+			'role'       => 'administrator',
+			'user_login' => 'superadmin',
+		) );
 		self::$editor_id = $factory->user->create( array(
 			'role' => 'editor',
 		) );
@@ -705,6 +711,401 @@ class WP_Test_REST_Attachments_Controller extends WP_Test_REST_Post_Type_Control
 		$response = $this->server->dispatch( $request );
 		$this->assertErrorResponse( 'rest_invalid_param', $response, 400 );
 	}
+
+	public function verify_attachment_roundtrip( $input = array(), $expected_output = array() ) {
+		// Create the post
+		$request = new WP_REST_Request( 'POST', '/wp/v2/media' );
+		$request->set_header( 'Content-Type', 'image/jpeg' );
+		$request->set_header( 'Content-Disposition', 'attachment; filename=canola.jpg' );
+		$request->set_body( file_get_contents( $this->test_file ) );
+
+		foreach ( $input as $name => $value ) {
+			$request->set_param( $name, $value );
+		}
+		$response = $this->server->dispatch( $request );
+		$this->assertEquals( 201, $response->get_status() );
+		$actual_output = $response->get_data();
+
+		// Compare expected API output to actual API output
+		$this->assertEquals( $expected_output['title']['raw']           , $actual_output['title']['raw'] );
+		$this->assertEquals( $expected_output['title']['rendered']      , trim( $actual_output['title']['rendered'] ) );
+		$this->assertEquals( $expected_output['description']['raw']     , $actual_output['description']['raw'] );
+		$this->assertEquals( $expected_output['description']['rendered'], trim( $actual_output['description']['rendered'] ) );
+		$this->assertEquals( $expected_output['caption']['raw']         , $actual_output['caption']['raw'] );
+		$this->assertEquals( $expected_output['caption']['rendered']    , trim( $actual_output['caption']['rendered'] ) );
+
+		// Compare expected API output to WP internal values
+		$post = get_post( $actual_output['id'] );
+		$this->assertEquals( $expected_output['title']['raw'], $post->post_title );
+		$this->assertEquals( $expected_output['description']['raw'], $post->post_content );
+		$this->assertEquals( $expected_output['caption']['raw'], $post->post_excerpt );
+
+		// Update the post
+		$request = new WP_REST_Request( 'PUT', sprintf( '/wp/v2/media/%d', $actual_output['id'] ) );
+		foreach ( $input as $name => $value ) {
+			$request->set_param( $name, $value );
+		}
+		$response = $this->server->dispatch( $request );
+		$this->assertEquals( 200, $response->get_status() );
+		$actual_output = $response->get_data();
+
+		// Compare expected API output to actual API output
+		$this->assertEquals( $expected_output['title']['raw']           , $actual_output['title']['raw'] );
+		$this->assertEquals( $expected_output['title']['rendered']      , trim( $actual_output['title']['rendered'] ) );
+		$this->assertEquals( $expected_output['description']['raw']     , $actual_output['description']['raw'] );
+		$this->assertEquals( $expected_output['description']['rendered'], trim( $actual_output['description']['rendered'] ) );
+		$this->assertEquals( $expected_output['caption']['raw']         , $actual_output['caption']['raw'] );
+		$this->assertEquals( $expected_output['caption']['rendered']    , trim( $actual_output['caption']['rendered'] ) );
+
+		// Compare expected API output to WP internal values
+		$post = get_post( $actual_output['id'] );
+		$this->assertEquals( $expected_output['title']['raw']  , $post->post_title );
+		$this->assertEquals( $expected_output['description']['raw'], $post->post_content );
+		$this->assertEquals( $expected_output['caption']['raw'], $post->post_excerpt );
+	}
+
+	public function test_attachment_roundtrip_as_author_1() {
+		wp_set_current_user( self::$author_id );
+		$this->assertFalse( current_user_can( 'unfiltered_html' ) );
+		$this->verify_attachment_roundtrip( array(
+			'title'       => '\o/ ¯\_(ツ)_/¯ 🚢',
+			'description' => '\o/ ¯\_(ツ)_/¯ 🚢',
+			'caption'     => '\o/ ¯\_(ツ)_/¯ 🚢',
+		), array(
+			'title' => array(
+				'raw'      => '\o/ ¯\_(ツ)_/¯ 🚢',
+				'rendered' => '\o/ ¯\_(ツ)_/¯ 🚢',
+			),
+			'description' => array(
+				'raw'      => '\o/ ¯\_(ツ)_/¯ 🚢',
+				'rendered' => '<p>\o/ ¯\_(ツ)_/¯ 🚢</p>',
+			),
+			'caption' => array(
+				'raw'      => '\o/ ¯\_(ツ)_/¯ 🚢',
+				'rendered' => '<p>\o/ ¯\_(ツ)_/¯ 🚢</p>',
+			),
+		) );
+	}
+
+	public function test_attachment_roundtrip_as_author_2() {
+		wp_set_current_user( self::$author_id );
+		$this->assertFalse( current_user_can( 'unfiltered_html' ) );
+		$this->verify_attachment_roundtrip( array(
+			'title'       => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+			'description' => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+			'caption'     => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+		), array(
+			'title' => array(
+				'raw'      => '\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;',
+				'rendered' => '\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;',
+			),
+			'description' => array(
+				'raw'      => '\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;',
+				'rendered' => '<p>\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;</p>',
+			),
+			'caption' => array(
+				'raw'      => '\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;',
+				'rendered' => '<p>\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;</p>',
+			),
+		) );
+	}
+
+	public function test_attachment_roundtrip_as_author_unfiltered_html_1() {
+		wp_set_current_user( self::$author_id );
+		$this->assertFalse( current_user_can( 'unfiltered_html' ) );
+		$this->verify_attachment_roundtrip( array(
+			'title'       => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+			'description' => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+			'caption'     => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+		), array(
+			'title' => array(
+				'raw'      => 'div <strong>strong</strong> oh noes',
+				'rendered' => 'div <strong>strong</strong> oh noes',
+			),
+			'description' => array(
+				'raw'      => '<div>div</div> <strong>strong</strong> oh noes',
+				'rendered' => "<div>div</div>\n<p> <strong>strong</strong> oh noes</p>",
+			),
+			'caption' => array(
+				'raw'      => '<div>div</div> <strong>strong</strong> oh noes',
+				'rendered' => "<div>div</div>\n<p> <strong>strong</strong> oh noes</p>",
+			),
+		) );
+	}
+
+	public function test_attachment_roundtrip_as_author_unfiltered_html_2() {
+		wp_set_current_user( self::$author_id );
+		$this->assertFalse( current_user_can( 'unfiltered_html' ) );
+		$this->verify_attachment_roundtrip( array(
+			'title'       => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+			'description' => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+			'caption'     => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+		), array(
+			'title' => array(
+				'raw'      => '<a href="#">link</a>',
+				'rendered' => '<a href="#">link</a>',
+			),
+			'description' => array(
+				'raw'      => '<a href="#" target="_blank">link</a>',
+				'rendered' => '<p><a href="#" target="_blank">link</a></p>',
+			),
+			'caption' => array(
+				'raw'      => '<a href="#" target="_blank">link</a>',
+				'rendered' => '<p><a href="#" target="_blank">link</a></p>',
+			),
+		) );
+	}
+
+	public function test_attachment_roundtrip_as_editor_1() {
+		wp_set_current_user( self::$editor_id );
+		$this->assertEquals( ! is_multisite(), current_user_can( 'unfiltered_html' ) );
+		$this->verify_attachment_roundtrip( array(
+			'title'       => '\o/ ¯\_(ツ)_/¯ 🚢',
+			'description' => '\o/ ¯\_(ツ)_/¯ 🚢',
+			'caption'     => '\o/ ¯\_(ツ)_/¯ 🚢',
+		), array(
+			'title' => array(
+				'raw'      => '\o/ ¯\_(ツ)_/¯ 🚢',
+				'rendered' => '\o/ ¯\_(ツ)_/¯ 🚢',
+			),
+			'description' => array(
+				'raw'      => '\o/ ¯\_(ツ)_/¯ 🚢',
+				'rendered' => '<p>\o/ ¯\_(ツ)_/¯ 🚢</p>',
+			),
+			'caption' => array(
+				'raw'      => '\o/ ¯\_(ツ)_/¯ 🚢',
+				'rendered' => '<p>\o/ ¯\_(ツ)_/¯ 🚢</p>',
+			),
+		) );
+	}
+
+	public function test_attachment_roundtrip_as_editor_2() {
+		wp_set_current_user( self::$editor_id );
+		if ( is_multisite() ) {
+			$this->assertFalse( current_user_can( 'unfiltered_html' ) );
+			$this->verify_attachment_roundtrip( array(
+				'title'       => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+				'description' => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+				'caption'     => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+			), array(
+				'title' => array(
+					'raw'      => '\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;',
+					'rendered' => '\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;',
+				),
+				'description' => array(
+					'raw'      => '\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;',
+					'rendered' => '<p>\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;</p>',
+				),
+				'caption' => array(
+					'raw'      => '\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;',
+					'rendered' => '<p>\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;</p>',
+				),
+			) );
+		} else {
+			$this->assertTrue( current_user_can( 'unfiltered_html' ) );
+			$this->verify_attachment_roundtrip( array(
+				'title'       => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+				'description' => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+				'caption'     => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+			), array(
+				'title' => array(
+					'raw'      => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+					'rendered' => '\\\&#038;\\\ &amp; &invalid; < &lt; &amp;lt;',
+				),
+				'description' => array(
+					'raw'      => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+					'rendered' => '<p>\\\&#038;\\\ &amp; &invalid; < &lt; &amp;lt;' . "\n</p>",
+				),
+				'caption' => array(
+					'raw'      => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+					'rendered' => '<p>\\\&#038;\\\ &amp; &invalid; < &lt; &amp;lt;' . "\n</p>",
+				),
+			) );
+		}
+	}
+
+	public function test_attachment_roundtrip_as_editor_unfiltered_html_1() {
+		wp_set_current_user( self::$editor_id );
+		if ( is_multisite() ) {
+			$this->assertFalse( current_user_can( 'unfiltered_html' ) );
+			$this->verify_attachment_roundtrip( array(
+				'title'       => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+				'description' => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+				'caption'     => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+			), array(
+				'title' => array(
+					'raw'      => 'div <strong>strong</strong> oh noes',
+					'rendered' => 'div <strong>strong</strong> oh noes',
+				),
+				'description' => array(
+					'raw'      => '<div>div</div> <strong>strong</strong> oh noes',
+					'rendered' => '<p><div>div</div> <strong>strong</strong> oh noes</p>',
+				),
+				'caption' => array(
+					'raw'      => '<div>div</div> <strong>strong</strong> oh noes',
+					'rendered' => '<p><div>div</div> <strong>strong</strong> oh noes</p>',
+				),
+			) );
+		} else {
+			$this->assertTrue( current_user_can( 'unfiltered_html' ) );
+			$this->verify_attachment_roundtrip( array(
+				'title'       => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+				'description' => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+				'caption'     => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+			), array(
+				'title' => array(
+					'raw'      => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+					'rendered' => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+				),
+				'description' => array(
+					'raw'      => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+					'rendered' => "<div>div</div>\n<p> <strong>strong</strong> <script>oh noes</script></p>",
+				),
+				'caption' => array(
+					'raw'      => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+					'rendered' => "<div>div</div>\n<p> <strong>strong</strong> <script>oh noes</script></p>",
+				),
+			) );
+		}
+	}
+
+	public function test_attachment_roundtrip_as_editor_unfiltered_html_2() {
+		wp_set_current_user( self::$editor_id );
+		if ( is_multisite() ) {
+			$this->assertFalse( current_user_can( 'unfiltered_html' ) );
+			$this->verify_attachment_roundtrip( array(
+				'title'       => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+				'description' => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+				'caption'     => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+			), array(
+				'title' => array(
+					'raw'      => '<a href="#">link</a>',
+					'rendered' => '<a href="#">link</a>',
+				),
+				'description' => array(
+					'raw'      => '<a href="#" target="_blank">link</a>',
+					'rendered' => '<p><a href="#" target="_blank">link</a></p>',
+				),
+				'caption' => array(
+					'raw'      => '<a href="#" target="_blank">link</a>',
+					'rendered' => '<p><a href="#" target="_blank">link</a></p>',
+				),
+			) );
+		} else {
+			$this->assertTrue( current_user_can( 'unfiltered_html' ) );
+			$this->verify_attachment_roundtrip( array(
+				'title'       => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+				'description' => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+				'caption'     => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+			), array(
+				'title' => array(
+					'raw'      => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+					'rendered' => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+				),
+				'description' => array(
+					'raw'      => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+					'rendered' => '<p><a href="#" target="_blank" data-unfiltered=true>link</a></p>',
+				),
+				'caption' => array(
+					'raw'      => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+					'rendered' => '<p><a href="#" target="_blank" data-unfiltered=true>link</a></p>',
+				),
+			) );
+		}
+	}
+
+	public function test_attachment_roundtrip_as_superadmin_1() {
+		wp_set_current_user( self::$superadmin_id );
+		$this->assertTrue( current_user_can( 'unfiltered_html' ) );
+		$this->verify_attachment_roundtrip( array(
+			'title'       => '\o/ ¯\_(ツ)_/¯ 🚢',
+			'description' => '\o/ ¯\_(ツ)_/¯ 🚢',
+			'caption'     => '\o/ ¯\_(ツ)_/¯ 🚢',
+		), array(
+			'title' => array(
+				'raw'      => '\o/ ¯\_(ツ)_/¯ 🚢',
+				'rendered' => '\o/ ¯\_(ツ)_/¯ 🚢',
+			),
+			'description' => array(
+				'raw'      => '\o/ ¯\_(ツ)_/¯ 🚢',
+				'rendered' => '<p>\o/ ¯\_(ツ)_/¯ 🚢</p>',
+			),
+			'caption' => array(
+				'raw'      => '\o/ ¯\_(ツ)_/¯ 🚢',
+				'rendered' => '<p>\o/ ¯\_(ツ)_/¯ 🚢</p>',
+			),
+		) );
+	}
+
+	public function test_attachment_roundtrip_as_superadmin_2() {
+		wp_set_current_user( self::$superadmin_id );
+		$this->assertTrue( current_user_can( 'unfiltered_html' ) );
+		$this->verify_attachment_roundtrip( array(
+			'title'       => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+			'description' => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+			'caption'     => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+		), array(
+			'title' => array(
+				'raw'      => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+				'rendered' => '\\\&#038;\\\ &amp; &invalid; < &lt; &amp;lt;',
+			),
+			'description' => array(
+				'raw'      => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+				'rendered' => '<p>\\\&#038;\\\ &amp; &invalid; < &lt; &amp;lt;' . "\n</p>",
+			),
+			'caption' => array(
+				'raw'      => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+				'rendered' => '<p>\\\&#038;\\\ &amp; &invalid; < &lt; &amp;lt;' . "\n</p>",
+			),
+		) );
+	}
+
+	public function test_attachment_roundtrip_as_superadmin_unfiltered_html_1() {
+		wp_set_current_user( self::$superadmin_id );
+		$this->assertTrue( current_user_can( 'unfiltered_html' ) );
+		$this->verify_attachment_roundtrip( array(
+			'title'       => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+			'description' => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+			'caption'     => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+		), array(
+			'title' => array(
+				'raw'      => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+				'rendered' => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+			),
+			'description' => array(
+				'raw'      => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+				'rendered' => "<div>div</div>\n<p> <strong>strong</strong> <script>oh noes</script></p>",
+			),
+			'caption' => array(
+				'raw'      => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+				'rendered' => "<div>div</div>\n<p> <strong>strong</strong> <script>oh noes</script></p>",
+			),
+		) );
+	}
+
+	public function test_attachment_roundtrip_as_superadmin_unfiltered_html_2() {
+		wp_set_current_user( self::$superadmin_id );
+		$this->assertTrue( current_user_can( 'unfiltered_html' ) );
+		$this->verify_attachment_roundtrip( array(
+			'title'       => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+			'description' => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+			'caption'     => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+		), array(
+			'title' => array(
+				'raw'      => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+				'rendered' => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+			),
+			'description' => array(
+				'raw'      => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+				'rendered' => '<p><a href="#" target="_blank" data-unfiltered=true>link</a></p>',
+			),
+			'caption' => array(
+				'raw'      => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+				'rendered' => '<p><a href="#" target="_blank" data-unfiltered=true>link</a></p>',
+			),
+		) );
+	}
+
 
 	public function test_delete_item() {
 		wp_set_current_user( self::$editor_id );
