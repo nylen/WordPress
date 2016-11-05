@@ -429,13 +429,13 @@ class WP_REST_Users_Controller extends WP_REST_Controller {
 			}
 
 			$user->ID = $user_id;
-			$user_id  = wp_update_user( $user );
+			$user_id  = wp_update_user( wp_slash( $user ) );
 
 			if ( is_wp_error( $user_id ) ) {
 				return $user_id;
 			}
 		} else {
-			$user_id = wp_insert_user( $user );
+			$user_id = wp_insert_user( wp_slash( $user ) );
 
 			if ( is_wp_error( $user_id ) ) {
 				return $user_id;
@@ -550,7 +550,7 @@ class WP_REST_Users_Controller extends WP_REST_Controller {
 		// Ensure we're operating on the same user we already checked.
 		$user->ID = $id;
 
-		$user_id = wp_update_user( $user );
+		$user_id = wp_update_user( wp_slash( $user ) );
 
 		if ( is_wp_error( $user_id ) ) {
 			return $user_id;
@@ -1061,7 +1061,7 @@ class WP_REST_Users_Controller extends WP_REST_Controller {
 					'type'        => 'string',
 					'context'     => array( 'embed', 'view', 'edit' ),
 					'arg_options' => array(
-						'sanitize_callback' => 'wp_filter_post_kses',
+						'sanitize_callback' => 'wp_kses_post',
 					),
 				),
 				'link'        => array(

@@ -12,6 +12,7 @@
 class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Testcase {
 	protected static $post_id;
 
+	protected static $superadmin_id;
 	protected static $editor_id;
 	protected static $author_id;
 	protected static $contributor_id;
@@ -23,6 +24,10 @@ class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Te
 	public static function wpSetUpBeforeClass( $factory ) {
 		self::$post_id = $factory->post->create();
 
+		self::$superadmin_id = $factory->user->create( array(
+			'role' => 'administrator',
+			'user_login' => 'superadmin',
+		) );
 		self::$editor_id = $factory->user->create( array(
 			'role' => 'editor',
 		) );
@@ -56,6 +61,9 @@ class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Te
 	public function setUp() {
 		parent::setUp();
 		register_post_type( 'youseeme', array( 'supports' => array(), 'show_in_rest' => true ) );
+		if ( is_multisite() ) {
+			update_site_option( 'site_admins', array( 'superadmin' ) );
+		}
 	}
 
 	public function test_register_routes() {
@@ -2001,6 +2009,237 @@ class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Te
 		remove_filter( 'map_meta_cap', array( $this, 'revoke_assign_term' ), 10, 4 );
 
 		$this->assertErrorResponse( 'rest_cannot_assign_term', $response, 403 );
+	}
+
+	public function verify_post_roundtrip( $input = array(), $expected_output = array() ) {
+		// Create the post
+		$request = new WP_REST_Request( 'POST', '/wp/v2/posts' );
+		foreach ( $input as $name => $value ) {
+			$request->set_param( $name, $value );
+		}
+		$response = $this->server->dispatch( $request );
+		$this->assertEquals( 201, $response->get_status() );
+
+		$expected_output = array_merge( $input, $expected_output );
+
+		$actual_output = $response->get_data();
+		$actual_output['content'] = $actual_output['content']['raw'];
+		$actual_output['title'] = $actual_output['title']['raw'];
+		$actual_output['excerpt'] = $actual_output['excerpt']['raw'];
+
+		// Compare expected API output to actual API output
+		foreach ( $expected_output as $name => $value ) {
+			$this->assertEquals( $expected_output[ $name ], $actual_output[ $name ], "bad $name on create (API)" );
+		}
+
+		// Compare expected API output to WP internal values
+		$post = get_post( $actual_output['id'] );
+		$this->assertEquals( $expected_output['title'], $post->post_title, 'bad title on create (WP)' );
+		$this->assertEquals( $expected_output['content'], $post->post_content, 'bad content on create (WP)' );
+		$this->assertEquals( $expected_output['excerpt'], $post->post_excerpt, 'bad excerpt on create (WP)' );
+
+		// Update the post
+		$request = new WP_REST_Request( 'PUT', sprintf( '/wp/v2/posts/%d', $actual_output['id'] ) );
+		foreach ( $input as $name => $value ) {
+			$request->set_param( $name, $value );
+		}
+		$response = $this->server->dispatch( $request );
+		$this->assertEquals( 200, $response->get_status() );
+
+		$actual_output = $response->get_data();
+		$actual_output['content'] = $actual_output['content']['raw'];
+		$actual_output['title'] = $actual_output['title']['raw'];
+		$actual_output['excerpt'] = $actual_output['excerpt']['raw'];
+
+		// Compare expected API output to actual API output
+		foreach ( $expected_output as $name => $value ) {
+			$this->assertEquals( $expected_output[ $name ], $actual_output[ $name ], "bad $name on update (API)" );
+		}
+
+		// Compare expected API output to WP internal values
+		$post = get_post( $actual_output['id'] );
+		$this->assertEquals( $expected_output['title'], $post->post_title, 'bad title on update (WP)' );
+		$this->assertEquals( $expected_output['content'], $post->post_content, 'bad content on update (WP)' );
+		$this->assertEquals( $expected_output['excerpt'], $post->post_excerpt, 'bad excerpt on update (WP)' );
+	}
+
+	public function test_post_roundtrip_as_author_1() {
+		wp_set_current_user( self::$author_id );
+		$this->assertFalse( current_user_can( 'unfiltered_html' ) );
+		$this->verify_post_roundtrip( array(
+			'title'   => '\o/ ¯\_(ツ)_/¯ 🚢',
+			'content' => '\o/ ¯\_(ツ)_/¯ 🚢',
+			'excerpt' => '\o/ ¯\_(ツ)_/¯ 🚢',
+		) );
+	}
+
+	public function test_post_roundtrip_as_author_2() {
+		wp_set_current_user( self::$author_id );
+		$this->assertFalse( current_user_can( 'unfiltered_html' ) );
+		$this->verify_post_roundtrip( array(
+			'title'   => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+			'content' => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+			'excerpt' => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+		), array(
+			'title'   => '\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;',
+			'content' => '\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;',
+			'excerpt' => '\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;',
+		) );
+	}
+
+	public function test_post_roundtrip_as_author_unfiltered_html_1() {
+		wp_set_current_user( self::$author_id );
+		$this->assertFalse( current_user_can( 'unfiltered_html' ) );
+		$this->verify_post_roundtrip( array(
+			'title'   => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+			'content' => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+			'excerpt' => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+		), array(
+			'title'   => 'div <strong>strong</strong> oh noes',
+			'content' => '<div>div</div> <strong>strong</strong> oh noes',
+			'excerpt' => '<div>div</div> <strong>strong</strong> oh noes',
+		) );
+	}
+
+	public function test_post_roundtrip_as_author_unfiltered_html_2() {
+		wp_set_current_user( self::$author_id );
+		$this->assertFalse( current_user_can( 'unfiltered_html' ) );
+		$this->verify_post_roundtrip( array(
+			'title'   => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+			'content' => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+			'excerpt' => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+		), array(
+			'title'   => '<a href="#">link</a>',
+			'content' => '<a href="#" target="_blank">link</a>',
+			'excerpt' => '<a href="#" target="_blank">link</a>',
+		) );
+	}
+
+	public function test_post_roundtrip_as_editor_1() {
+		wp_set_current_user( self::$editor_id );
+		$this->assertEquals( ! is_multisite(), current_user_can( 'unfiltered_html' ) );
+		$this->verify_post_roundtrip( array(
+			'title'   => '\o/ ¯\_(ツ)_/¯ 🚢',
+			'content' => '\o/ ¯\_(ツ)_/¯ 🚢',
+			'excerpt' => '\o/ ¯\_(ツ)_/¯ 🚢',
+		) );
+	}
+
+	public function test_post_roundtrip_as_editor_2() {
+		wp_set_current_user( self::$editor_id );
+		if ( is_multisite() ) {
+			$this->assertFalse( current_user_can( 'unfiltered_html' ) );
+			$this->verify_post_roundtrip( array(
+				'title'   => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+				'content' => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+				'excerpt' => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+			), array(
+				'title'   => '\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;',
+				'content' => '\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;',
+				'excerpt' => '\\\&amp;\\\ &amp; &amp;invalid; &lt; &lt; &amp;lt;',
+			) );
+		} else {
+			$this->assertTrue( current_user_can( 'unfiltered_html' ) );
+			$this->verify_post_roundtrip( array(
+				'title'   => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+				'content' => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+				'excerpt' => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+			) );
+		}
+	}
+
+	public function test_post_roundtrip_as_editor_unfiltered_html_1() {
+		wp_set_current_user( self::$editor_id );
+		if ( is_multisite() ) {
+			$this->assertFalse( current_user_can( 'unfiltered_html' ) );
+			$this->verify_post_roundtrip( array(
+				'title'   => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+				'content' => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+				'excerpt' => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+			), array(
+				'title'   => 'div <strong>strong</strong> oh noes',
+				'content' => '<div>div</div> <strong>strong</strong> oh noes',
+				'excerpt' => '<div>div</div> <strong>strong</strong> oh noes',
+			) );
+		} else {
+			$this->assertTrue( current_user_can( 'unfiltered_html' ) );
+			$this->verify_post_roundtrip( array(
+				'title'   => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+				'content' => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+				'excerpt' => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+			) );
+		}
+	}
+
+	public function test_post_roundtrip_as_editor_unfiltered_html_2() {
+		wp_set_current_user( self::$editor_id );
+		if ( is_multisite() ) {
+			$this->assertFalse( current_user_can( 'unfiltered_html' ) );
+			$this->verify_post_roundtrip( array(
+				'title'   => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+				'content' => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+				'excerpt' => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+			), array(
+				'title'   => '<a href="#">link</a>',
+				'content' => '<a href="#" target="_blank">link</a>',
+				'excerpt' => '<a href="#" target="_blank">link</a>',
+			) );
+		} else {
+			$this->assertTrue( current_user_can( 'unfiltered_html' ) );
+			$this->verify_post_roundtrip( array(
+				'title'   => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+				'content' => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+				'excerpt' => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+			) );
+		}
+	}
+
+	public function test_post_roundtrip_as_superadmin_1() {
+		wp_set_current_user( self::$superadmin_id );
+		$this->assertTrue( current_user_can( 'unfiltered_html' ) );
+		$this->verify_post_roundtrip( array(
+			'title'   => '\o/ ¯\_(ツ)_/¯ 🚢',
+			'content' => '\o/ ¯\_(ツ)_/¯ 🚢',
+			'excerpt' => '\o/ ¯\_(ツ)_/¯ 🚢',
+		) );
+	}
+
+	public function test_post_roundtrip_as_superadmin_2() {
+		wp_set_current_user( self::$superadmin_id );
+		$this->assertTrue( current_user_can( 'unfiltered_html' ) );
+		$this->verify_post_roundtrip( array(
+			'title'   => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+			'content' => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+			'excerpt' => '\\\&\\\ &amp; &invalid; < &lt; &amp;lt;',
+		) );
+	}
+
+	public function test_post_roundtrip_as_superadmin_unfiltered_html_1() {
+		wp_set_current_user( self::$superadmin_id );
+		$this->assertTrue( current_user_can( 'unfiltered_html' ) );
+		$this->verify_post_roundtrip( array(
+			'title'   => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+			'content' => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+			'excerpt' => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+		), array(
+			'title'   => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+			'content' => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+			'excerpt' => '<div>div</div> <strong>strong</strong> <script>oh noes</script>',
+		) );
+	}
+
+	public function test_post_roundtrip_as_superadmin_unfiltered_html_2() {
+		wp_set_current_user( self::$superadmin_id );
+		$this->assertTrue( current_user_can( 'unfiltered_html' ) );
+		$this->verify_post_roundtrip( array(
+			'title'   => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+			'content' => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+			'excerpt' => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+		), array(
+			'title'   => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+			'content' => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+			'excerpt' => '<a href="#" target="_blank" data-unfiltered=true>link</a>',
+		) );
 	}
 
 	public function test_delete_item() {
