@@ -644,26 +644,12 @@ class WP_REST_Comments_Controller extends WP_REST_Controller {
 				return new WP_Error( $error_code, __( 'Comment field exceeds maximum length allowed.' ), array( 'status' => 400 ) );
 			}
 
-			// wp_update_comment() can return 0 if a real error occurs (this should be an API error)
-			// or if no DB rows were updated (this should not be an API error).
-			// So skip the update if everything is the same.
-			$check_comment = (array) $comment;
-			$check_comment = $this->prepare_item_for_response( $comment );
-			$check_args = $this->prepare_item_for_response( $prepared_args );
-			$needs_update = false;
-			foreach ( $prepared_args as $arg => $new_value ) {
-				if ( $new_value !== $check_comment[ $arg ] ) {
-					$needs_update = true;
-					break;
-				}
-			}
+			add_filter( 'wp_update_comment_error', '__return_false' );
+			$updated = wp_update_comment( wp_slash( (array) $prepared_args ) );
+			remove_filter( 'wp_update_comment_error', '__return_false' );
 
-			if ( $needs_update ) {
-				$updated = wp_update_comment( wp_slash( (array) $prepared_args ) );
-
-				if ( 0 === $updated ) {
-					return new WP_Error( 'rest_comment_failed_edit', __( 'Updating comment failed.' ), array( 'status' => 500 ) );
-				}
+			if ( false === $updated ) {
+				return new WP_Error( 'rest_comment_failed_edit', __( 'Updating comment failed.' ), array( 'status' => 500 ) );
 			}
 
 			if ( isset( $request['status'] ) ) {
