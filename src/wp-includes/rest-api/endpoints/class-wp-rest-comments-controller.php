@@ -646,15 +646,24 @@ class WP_REST_Comments_Controller extends WP_REST_Controller {
 
 			// wp_update_comment() can return 0 if a real error occurs (this should be an API error)
 			// or if no DB rows were updated (this should not be an API error).
+			// So skip the update if everything is the same.
+			$check_comment = (array) $comment;
+			$check_comment = $this->prepare_item_for_response( $comment );
+			$check_args = $this->prepare_item_for_response( $prepared_args );
+			$needs_update = false;
+			foreach ( $prepared_args as $arg => $new_value ) {
+				if ( $new_value !== $check_comment[ $arg ] ) {
+					$needs_update = true;
+					break;
+				}
+			}
 
-			/** This action is documented in wp-includes/comment.php */
-			$edit_comment_count = did_action( 'edit_comment' );
-			$updated = wp_update_comment( wp_slash( (array) $prepared_args ) );
-			/** This action is documented in wp-includes/comment.php */
-			$edit_comment_count = did_action( 'edit_comment' ) - $edit_comment_count;
+			if ( $needs_update ) {
+				$updated = wp_update_comment( wp_slash( (array) $prepared_args ) );
 
-			if ( 0 === $updated && 0 === $edit_comment_count ) {
-				return new WP_Error( 'rest_comment_failed_edit', __( 'Updating comment failed.' ), array( 'status' => 500 ) );
+				if ( 0 === $updated ) {
+					return new WP_Error( 'rest_comment_failed_edit', __( 'Updating comment failed.' ), array( 'status' => 500 ) );
+				}
 			}
 
 			if ( isset( $request['status'] ) ) {
