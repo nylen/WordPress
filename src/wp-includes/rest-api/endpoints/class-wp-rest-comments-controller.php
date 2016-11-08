@@ -625,7 +625,7 @@ class WP_REST_Comments_Controller extends WP_REST_Controller {
 		}
 
 		if ( ! empty( $prepared_args['comment_post_ID'] ) ) {
-			$post = $this->get_post( $prepared_args['comment_post_ID'] );
+			$post = get_post( $prepared_args['comment_post_ID'] );
 			if ( empty( $post ) ) {
 				return new WP_Error( 'rest_comment_invalid_post_id', __( 'Invalid comment post id.' ), array( 'status' => 404 ) );
 			}
