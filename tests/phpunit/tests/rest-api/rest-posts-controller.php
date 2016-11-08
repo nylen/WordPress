@@ -2031,7 +2031,7 @@ class WP_Test_REST_Posts_Controller extends WP_Test_REST_Post_Type_Controller_Te
 
 		// Compare expected API output to WP internal values
 		$post = get_post( $actual_output['id'] );
-		$this->assertEquals( $expected_output['title']['raw'], $post->post_title );
+		$this->assertEquals( $expected_output['title']['raw']  , $post->post_title );
 		$this->assertEquals( $expected_output['content']['raw'], $post->post_content );
 		$this->assertEquals( $expected_output['excerpt']['raw'], $post->post_excerpt );
 
