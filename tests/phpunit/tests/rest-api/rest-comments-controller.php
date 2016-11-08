@@ -1618,6 +1618,13 @@ class WP_Test_REST_Comments_Controller extends WP_Test_REST_Controller_Testcase 
 		$this->assertEquals( '2014-11-07T10:14:25', $comment['date'] );
 	}
 
+	public function test_update_item_no_change() {
+		wp_set_current_user( self::$admin_id );
+		$request = new WP_REST_Request( 'PUT', sprintf( '/wp/v2/comments/%d', self::$approved_id ) );
+		$response = $this->server->dispatch( $request );
+		$this->assertEquals( 200, $response->get_status() );
+	}
+
 	public function test_update_comment_status() {
 		wp_set_current_user( self::$admin_id );
 

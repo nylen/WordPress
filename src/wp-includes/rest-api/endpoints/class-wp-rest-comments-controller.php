@@ -644,9 +644,18 @@ class WP_REST_Comments_Controller extends WP_REST_Controller {
 				return new WP_Error( $error_code, __( 'Comment field exceeds maximum length allowed.' ), array( 'status' => 400 ) );
 			}
 
+			// wp_update_comment() can return 0 if a real error occurs (this should be an API error)
+			// or if no DB rows were updated (this should not be an API error).
+			$this->comment_updated = false;
+			/** This action is documented in wp-includes/comment.php */
+			add_action( 'edit_comment', array( $this, 'update_item_success' ) );
+
 			$updated = wp_update_comment( wp_slash( (array) $prepared_args ) );
 
-			if ( 0 === $updated ) {
+			/** This action is documented in wp-includes/comment.php */
+			remove_action( 'edit_comment', array( $this, 'update_item_success' ) );
+
+			if ( 0 === $updated && ! $this->comment_updated ) {
 				return new WP_Error( 'rest_comment_failed_edit', __( 'Updating comment failed.' ), array( 'status' => 500 ) );
 			}
 
@@ -681,6 +690,16 @@ class WP_REST_Comments_Controller extends WP_REST_Controller {
 		do_action( 'rest_insert_comment', $comment, $request, false );
 
 		return rest_ensure_response( $response );
+	}
+
+	/**
+	 * Sets a flag to indicate that a comment edit succeeded.
+	 *
+	 * @since 4.7.0
+	 * @access public
+	 */
+	function update_item_success() {
+		$this->comment_updated = true;
 	}
 
 	/**
