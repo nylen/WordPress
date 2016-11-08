@@ -651,7 +651,11 @@ class WP_REST_Comments_Controller extends WP_REST_Controller {
 				return new WP_Error( $error_code, __( 'Comment field exceeds maximum length allowed.' ), array( 'status' => 400 ) );
 			}
 
-			wp_update_comment( wp_slash( (array) $prepared_args ) );
+			$updated = wp_update_comment( wp_slash( (array) $prepared_args ) );
+
+			if ( false === $updated ) {
+				return new WP_Error( 'rest_comment_failed_edit', __( 'Updating comment failed.' ), array( 'status' => 500 ) );
+			}
 
 			if ( isset( $request['status'] ) ) {
 				$this->handle_status_param( $request['status'], $comment );
