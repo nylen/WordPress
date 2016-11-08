@@ -1776,6 +1776,17 @@ class WP_Test_REST_Comments_Controller extends WP_Test_REST_Controller_Testcase 
 		$this->assertErrorResponse( 'rest_comment_invalid_id', $response, 404 );
 	}
 
+	public function test_update_comment_invalid_post_id() {
+		wp_set_current_user( self::$admin_id );
+
+		$request = new WP_REST_Request( 'PUT', sprintf( '/wp/v2/comments/%d', self::$approved_id ) );
+		$request->set_param( 'post', REST_TESTS_IMPOSSIBLY_HIGH_NUMBER );
+		$request->set_param( 'content', 'avoid rest_comment_content_required error' );
+
+		$response = $this->server->dispatch( $request );
+		$this->assertErrorResponse( 'rest_comment_invalid_post_id', $response, 404 );
+	}
+
 	public function test_update_comment_invalid_permission() {
 		wp_set_current_user( 0 );
 

@@ -624,6 +624,13 @@ class WP_REST_Comments_Controller extends WP_REST_Controller {
 			return $prepared_args;
 		}
 
+		if ( ! empty( $prepared_args['comment_post_ID'] ) ) {
+			$post = $this->get_post( $prepared_args['comment_post_ID'] );
+			if ( empty( $post ) ) {
+				return new WP_Error( 'rest_comment_invalid_post_id', __( 'Invalid comment post id.' ), array( 'status' => 404 ) );
+			}
+		}
+
 		if ( empty( $prepared_args ) && isset( $request['status'] ) ) {
 			// Only the comment status is being changed.
 			$change = $this->handle_status_param( $request['status'], $comment );
@@ -644,13 +651,7 @@ class WP_REST_Comments_Controller extends WP_REST_Controller {
 				return new WP_Error( $error_code, __( 'Comment field exceeds maximum length allowed.' ), array( 'status' => 400 ) );
 			}
 
-			add_filter( 'wp_update_comment_error', '__return_false' );
-			$updated = wp_update_comment( wp_slash( (array) $prepared_args ) );
-			remove_filter( 'wp_update_comment_error', '__return_false' );
-
-			if ( false === $updated ) {
-				return new WP_Error( 'rest_comment_failed_edit', __( 'Updating comment failed.' ), array( 'status' => 500 ) );
-			}
+			wp_update_comment( wp_slash( (array) $prepared_args ) );
 
 			if ( isset( $request['status'] ) ) {
 				$this->handle_status_param( $request['status'], $comment );

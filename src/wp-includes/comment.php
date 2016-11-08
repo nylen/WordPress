@@ -2143,23 +2143,12 @@ function wp_update_comment($commentarr) {
 	// First, get all of the original fields
 	$comment = get_comment($commentarr['comment_ID'], ARRAY_A);
 	if ( empty( $comment ) ) {
-		/**
-		 * Filters the error return value of wp_update_comment().
-		 *
-		 * Allows returning a value different than zero, which also indicates a
-		 * successful update with no changed data.
-		 *
-		 * @since 4.7.0
-		 *
-		 * @param mixed $error The error return value.
-		 */
-		return apply_filters( 'wp_update_comment_error', 0 );
+		return 0;
 	}
 
 	// Make sure that the comment post ID is valid (if specified).
 	if ( ! empty( $commentarr['comment_post_ID'] ) && ! get_post( $commentarr['comment_post_ID'] ) ) {
-		/** This filter is documented in wp-includes/comment.php */
-		return apply_filters( 'wp_update_comment_error', 0 );
+		return 0;
 	}
 
 	// Escape data pulled from DB.
